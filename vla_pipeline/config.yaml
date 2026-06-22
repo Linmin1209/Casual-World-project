@@ -1,0 +1,46 @@
+# Hybrid VLA pipeline for CausalWorld
+# Target: macro-average mean_full_integrated_fractional_success >= 0.574 (+15% vs baseline ~0.499)
+
+data:
+  output_dir: /data1/linmin/CausalWorld/data/vla_demos
+  export_dir: /data1/linmin/CausalWorld/data/vla_train
+  tasks:
+    - pushing
+    - picking
+    - pick_and_place
+  # Hard protocols where baseline is weak; P0-P5 optional for replay buffer
+  protocols: [P6, P7, P8, P9, P10, P11]
+  episodes_per_protocol: 50
+  min_fractional_success: 0.3
+  log_every_steps: 25
+  quiet_intervention_logs: true
+  save_every_n_episodes: 10
+  camera_indices: [0, 1, 2]
+  image_size: 128
+
+teacher:
+  # Override if bundled zips are missing (download from CausalWorld release)
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints
+  batch_size: 32
+  epochs: 30
+  lr: 0.0003
+  val_ratio: 0.1
+  image_size: 128
+
+hybrid:
+  # action = (1-alpha)*vla + alpha*teacher; tune on val hard protocols
+  alpha: 0.35
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints/bc_best.pt
+
+evaluation:
+  output_dir: /data1/linmin/CausalWorld/data/vla_eval
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+  fraction: 1.0
+  episodes_per_protocol: 200
+  target_macro_avg: 0.574

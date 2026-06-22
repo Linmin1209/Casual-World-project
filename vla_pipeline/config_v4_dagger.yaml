@@ -1,0 +1,103 @@
+dagger:
+  episodes_per_protocol: 25
+  gpu_ids:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  log_every_episodes: 5
+  num_workers: 6
+  protocols:
+  - P6
+  - P7
+  - P8
+  - P9
+  - P10
+  - P11
+  quiet: true
+  rounds: 2
+  seed_offset: 5000
+  skip_existing: true
+  skip_frame: 3
+  tasks:
+  - pushing
+  - picking
+  - pick_and_place
+data:
+  export_dir: /data1/linmin/CausalWorld/data/vla_train_v4_dagger
+  include_rejected: true
+  min_episode_max_fractional_success: 0.0
+  min_step_fractional_success: 0.05
+  output_dir: /data1/linmin/CausalWorld/data/vla_demos
+  subsample_every_n_steps: 1
+  tasks:
+  - pushing
+  - picking
+  - pick_and_place
+evaluation:
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+  batch_workers: true
+  episodes_per_protocol: 200
+  episodes_per_protocol_fast: 10
+  fast_eval: false
+  fraction: 1.0
+  gpu_ids:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  log_every_episodes: 0
+  num_workers: 6
+  output_dir: /data1/linmin/CausalWorld/data/vla_eval_v4_full
+  skip_frame: 10
+  target_macro_avg: 0.574
+hybrid:
+  beta_by_protocol:
+    P10: 0.25
+    P11: 0.25
+    P6: 0.0
+    P7: 0.2
+    P8: 0.2
+    P9: 0.2
+  beta_default: 0.2
+  beta_easy: 0.0
+  blend_mode: residual
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v4_dagger/bc_best.pt
+teacher:
+  checkpoints:
+    pick_and_place: null
+    picking: null
+    pushing: null
+training:
+  action_horizon: 1
+  action_mse_eval_batches: 30
+  action_mse_eval_every: 5
+  augment_train: true
+  batch_size: 64
+  best_checkpoint_metric: val_mse_w
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v4_dagger
+  cosine_lr: true
+  dagger_sample_weight: 2.0
+  dropout: 0.2
+  early_stop_patience: 6
+  epochs: 30
+  fm_hidden: 512
+  freeze_backbone_epochs: 4
+  grad_clip: 1.0
+  image_size: 128
+  init_checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v4_dagger/bc_best.pt
+  lang_dim: 256
+  loss_weight_by_fs: true
+  lr_backbone: 1.5e-05
+  lr_head: 8.0e-05
+  lr_min: 1.0e-06
+  model_type: resnet_film_mse
+  num_views: 3
+  num_workers: 4
+  split_seed: 42
+  val_ratio: 0.1
+  weight_decay: 0.001

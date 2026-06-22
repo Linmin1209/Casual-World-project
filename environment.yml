@@ -1,16 +1,17 @@
 name: causal_world
 channels:
-- conda-forge
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/
 dependencies:
-- python=3.7.4
-- sphinx
-- jupyter
-- scipy
-- pip:
-  - pybullet==3.2.5
-  - gym==0.17.2
-  - catkin_pkg
-  - sphinx_rtd_theme
-  - pytest
-  - psutil
-  - sphinxcontrib-bibtex
+  - python=3.7.12
+  - pip
+  - sphinx
+  - jupyter
+  - scipy
+  - pip:
+      - pybullet==3.2.5
+      - gym==0.17.2
+      - catkin_pkg
+      - sphinx_rtd_theme
+      - pytest
+      - psutil
+      - sphinxcontrib-bibtex

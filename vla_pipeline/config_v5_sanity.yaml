@@ -1,0 +1,55 @@
+# V5 sanity check: V3 BC checkpoint + V5 selective hybrid beta (hard protocols only)
+
+data:
+  tasks: [pushing, picking, pick_and_place]
+
+teacher:
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  image_size: 128
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v3
+
+hybrid:
+  blend_mode: residual
+  beta_default: 0.0
+  beta_easy: 0.0
+  max_correction: 0.15
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v3/bc_best.pt
+  beta_by_task_protocol:
+    pushing:
+      P6: 0.0
+      P7: 0.20
+      P8: 0.15
+      P9: 0.15
+      P10: 0.30
+      P11: 0.30
+    picking:
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.10
+      P11: 0.25
+    pick_and_place:
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.10
+      P11: 0.10
+
+evaluation:
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+  batch_workers: true
+  episodes_per_protocol: 50
+  fast_eval: true
+  fraction: 1.0
+  gpu_ids: [0, 1, 2, 3, 4, 5]
+  num_workers: 6
+  output_dir: /data1/linmin/CausalWorld/data/vla_eval_v5_sanity
+  skip_frame: 10
+  target_macro_avg: 0.574

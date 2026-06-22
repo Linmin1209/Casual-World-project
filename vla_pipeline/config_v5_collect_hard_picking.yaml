@@ -1,0 +1,40 @@
+# V5 Phase C: extra teacher demos for picking P6-P9 (hard grasp protocols)
+
+data:
+  output_dir: /data1/linmin/CausalWorld/data/vla_demos
+  export_dir: /data1/linmin/CausalWorld/data/vla_train_v5
+  include_rejected: true
+  min_step_fractional_success: 0.05
+  min_usable_episode_max_fs: 0.05
+  min_episode_max_fractional_success: 0.0
+  subsample_every_n_steps: 1
+
+  tasks: [picking]
+  protocols: [P6, P7, P8, P9]
+  target_usable_episodes_per_protocol: 40
+  max_episodes_per_protocol: 400
+  batch_episodes_per_round: 20
+  collection_seed_offset: 7000
+  collection_seed_step: 200
+  min_fractional_success: 0.0
+  log_every_steps: 25
+  quiet_intervention_logs: true
+  skip_existing: true
+  num_workers: 6
+  gpu_ids: []
+  camera_indices: [0, 1, 2]
+  image_size: 128
+
+teacher:
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v5
+  model_type: resnet_film_mse
+  action_horizon: 1
+  val_ratio: 0.1
+  split_seed: 42
+  image_size: 128

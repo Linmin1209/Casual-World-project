@@ -1,0 +1,81 @@
+# R2 training run: aux loss + differential LR + full step export (parallel to v1 eval)
+# Checkpoint separate from vla_checkpoints_v2 so running evaluate.py is unaffected.
+
+data:
+  output_dir: /data1/linmin/CausalWorld/data/vla_demos
+  export_dir: /data1/linmin/CausalWorld/data/vla_train_v2_r2
+  include_rejected: true
+  export_mode: step_filter
+  min_step_fractional_success: 0.05
+  min_episode_max_fractional_success: 0.0
+  subsample_every_n_steps: 1
+
+  tasks: [pushing, picking, pick_and_place]
+  protocols: [P0, P1, P2, P3, P4, P5]
+  hard_protocols: [P6, P7, P8, P9, P10, P11]
+  episodes_per_protocol: 30
+  episodes_per_hard_protocol: 30
+  min_fractional_success: 0.0
+  log_every_steps: 25
+  quiet_intervention_logs: true
+  skip_existing: true
+  camera_indices: [0, 1, 2]
+  image_size: 128
+
+teacher:
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v2_r2
+  model_type: resnet_film_flow
+  action_horizon: 8
+  num_views: 3
+  lang_dim: 256
+  fm_hidden: 512
+  fm_sample_steps: 10
+  batch_size: 24                 # smaller batch: eval uses GPU in parallel
+  epochs: 50
+  lr: 0.0003
+  lr_head: 0.0003
+  lr_backbone: 0.00005
+  lr_min: 0.000001
+  cosine_lr: true
+  weight_decay: 0.0001
+  grad_clip: 1.0
+  val_ratio: 0.1
+  split_seed: 42
+  image_size: 128
+  num_workers: 2
+  loss_weight_by_fs: true
+  aux_denoise_loss_weight: 0.4
+  freeze_backbone_epochs: 3
+  early_stop_patience: 15
+  best_checkpoint_metric: val_cfm_w
+  action_mse_eval_batches: 20
+  action_mse_eval_every: 5
+
+hybrid:
+  # task-specific alpha (hard tasks rely more on teacher early on)
+  alpha_default: 0.5
+  alpha_by_task:
+    pushing: 0.75
+    picking: 0.80
+    pick_and_place: 0.85
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v2_r2/bc_best.pt
+
+evaluation:
+  output_dir: /data1/linmin/CausalWorld/data/vla_eval_v2_r2
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+  fraction: 1.0
+  episodes_per_protocol: 200
+  num_workers: 6              # parallel PyBullet envs (1 worker per GPU recommended)
+  gpu_ids: [0, 1, 2, 3, 4, 5]
+  target_macro_avg: 0.574
+
+dagger:
+  rounds: 2
+  episodes_per_protocol: 15
+  alpha: 0.6

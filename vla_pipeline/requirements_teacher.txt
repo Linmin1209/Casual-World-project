@@ -1,0 +1,5 @@
+# Teacher / baseline PPO (Python 3.7 + TF1 only — do NOT use TensorFlow 2.x)
+stable-baselines==2.10.2
+tensorflow==1.15.5
+protobuf>=3.20,<3.21
+numpy>=1.18,<1.19

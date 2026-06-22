@@ -1,0 +1,87 @@
+# V3: Phase B (P0-P5 demos) + direct MSE policy + protocol-gated residual hybrid
+# Fixes R2 failure: no easy-protocol data, flow matching too weak, bad linear blend.
+
+data:
+  output_dir: /data1/linmin/CausalWorld/data/vla_demos
+  export_dir: /data1/linmin/CausalWorld/data/vla_train_v3
+  include_rejected: true
+  min_step_fractional_success: 0.05
+  min_episode_max_fractional_success: 0.0
+  subsample_every_n_steps: 1
+
+  # Phase B collection target (teacher-strong protocols)
+  tasks: [pushing, picking, pick_and_place]
+  protocols: [P0, P1, P2, P3, P4, P5]
+  episodes_per_protocol: 30
+  min_fractional_success: 0.0
+  log_every_steps: 25
+  quiet_intervention_logs: true
+  skip_existing: true
+  num_workers: 6                 # parallel PyBullet envs for collection
+  gpu_ids: []                     # empty = CPU teacher (recommended); or [0,1,...]
+  camera_indices: [0, 1, 2]
+  image_size: 128
+
+teacher:
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v3
+  model_type: resnet_film_mse       # direct regression (stable vs flow)
+  action_horizon: 1                 # single-step BC
+  num_views: 3
+  lang_dim: 256
+  fm_hidden: 512
+  batch_size: 64
+  epochs: 40
+  lr_head: 0.0001
+  lr_backbone: 0.00002
+  lr_min: 0.000001
+  cosine_lr: true
+  weight_decay: 0.001
+  grad_clip: 1.0
+  val_ratio: 0.1
+  split_seed: 42
+  image_size: 128
+  num_workers: 4
+  loss_weight_by_fs: true
+  aux_denoise_loss_weight: 0.0
+  freeze_backbone_epochs: 8
+  early_stop_patience: 5
+  dropout: 0.2
+  augment_train: true
+  best_checkpoint_metric: val_mse_w
+  action_mse_eval_batches: 30
+  action_mse_eval_every: 5
+
+hybrid:
+  blend_mode: residual              # action = teacher + beta * (vla - teacher)
+  beta_default: 0.20                # hard protocols P6-P11: small VLA nudge
+  beta_easy: 0.0                    # P0-P5: pure teacher (baseline-level)
+  beta_by_protocol:
+    P6: 0.15
+    P7: 0.20
+    P8: 0.20
+    P9: 0.20
+    P10: 0.25
+    P11: 0.25
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v3/bc_best.pt
+
+evaluation:
+  output_dir: /data1/linmin/CausalWorld/data/vla_eval_v3
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+  skip_frame: 3
+  log_every_episodes: 5
+  fraction: 1.0
+  episodes_per_protocol: 200
+  num_workers: 6
+  gpu_ids: [0, 1, 2, 3, 4, 5]
+  target_macro_avg: 0.574
+
+dagger:
+  rounds: 2
+  episodes_per_protocol: 15
+  alpha: 0.6

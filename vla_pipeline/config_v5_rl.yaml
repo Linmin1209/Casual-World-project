@@ -1,0 +1,83 @@
+# V5 RL: Expert demos (BC warm-start) + EA-AWR on causal hard protocols
+
+data:
+  export_dir: /data1/linmin/CausalWorld/data/vla_train_v5
+  tasks: [pushing, picking]
+
+teacher:
+  checkpoints:
+    pushing: null
+    picking: null
+    pick_and_place: null
+
+training:
+  model_type: resnet_film_mse
+  action_horizon: 1
+  image_size: 128
+  lang_dim: 256
+  fm_hidden: 512
+  num_views: 3
+  batch_size: 32
+  grad_clip: 1.0
+  weight_decay: 0.001
+  num_workers: 2
+
+evaluation:
+  skip_frame: 10
+  baseline_dir: /data1/linmin/CausalWorld/baseline_eval
+
+rl:
+  init_checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v5/bc_best_r00.pt
+  checkpoint_dir: /data1/linmin/CausalWorld/data/vla_checkpoints_v5_rl
+  tasks: [pushing, picking]
+  protocols_by_task:
+    pushing: [P7, P8, P9, P10, P11]
+    picking: [P10, P11]
+  skip_frame: 10
+  iters: 40
+  episodes_per_iter: 6
+  grad_steps_per_iter: 6
+  expert_batch_size: 32
+  online_batch_size: 16
+  online_buffer_episodes: 120
+  seed: 42
+  explore_std: 0.10
+  explore_decay: 0.992
+  advantage_temperature: 0.12
+  min_advantage_to_store: -0.02
+  baseline_momentum: 0.92
+  expert_bc_weight: 1.0
+  online_bc_weight: 2.5
+  teacher_kl_weight: 0.4
+  lr_head: 3.0e-05
+  lr_backbone: 5.0e-06
+  train_backbone: false
+
+hybrid:
+  blend_mode: residual
+  beta_default: 0.0
+  beta_easy: 0.0
+  max_correction: 0.15
+  checkpoint: /data1/linmin/CausalWorld/data/vla_checkpoints_v5_rl/rl_best.pt
+  beta_by_task_protocol:
+    pushing:
+      P6: 0.0
+      P7: 0.15
+      P8: 0.10
+      P9: 0.10
+      P10: 0.25
+      P11: 0.25
+    picking:
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.15
+      P11: 0.20
+    pick_and_place:
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.0
+      P11: 0.0
