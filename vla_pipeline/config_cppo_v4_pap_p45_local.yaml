@@ -1,0 +1,75 @@
+# CPPPO v4 — close final +0.0034 global macro gap to +15% target (0.5743).
+#
+# v3 latest best: 0.5709 (+14.32%), gap -0.0034
+# Root cause: pap P4/P5 collapse on s2_12M (-0.28/-0.42 vs baseline)
+# Fix P4+P5 halfway back (~+0.09 each) → +0.015 global → clears target
+#
+# v4 = three layers (run in order):
+#   A) s2_12M pap full eval (confirm gap)
+#   B) v4a P4/P5 recovery finetune from s2_12M (2M steps)
+#   C) v4b protocol-routed teacher OR TSH last mile if still short
+
+cppo:
+  version: v3
+  stage: 4
+  checkpoint_dir: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v4_pap_p45
+  init_checkpoints:
+    pick_and_place: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage2_pap/pick_and_place/intermediate/pick_and_place_cppo_v3_12000000_steps.zip
+  num_envs: 20
+  seed: 43
+  skip_frame: 3
+  variables_space: space_a_b
+  total_timesteps: 2000000
+  validate_every_timesteps: 500000
+  resume: true
+  tasks: [pick_and_place]
+  warm_start_baseline: false
+
+  # Only mid protocols that collapsed; anchor easy gains from s2_12M.
+  protocol_allowlist_by_task:
+    pick_and_place: [P0, P1, P2, P3, P4, P5]
+
+  sampling:
+    adaptive: false
+    stratified_static_ratio: 1.0
+
+  anchor_protocols: [P0, P1, P2, P3]
+  anchor_min_sampling_ratio: 0.50
+
+  policy:
+    type: residual
+    embed_dim: 64
+    proto_scale: 1.0
+    net_arch:
+      - pi: [256, 256]
+        vf: [256, 256]
+
+  ppo:
+    gamma: 0.99
+    n_steps: 2048
+    ent_coef: 0.005
+    learning_rate: 0.00002
+    vf_coef: 0.5
+    max_grad_norm: 0.3
+    nminibatches: 40
+    noptepochs: 4
+
+  protocol_weights:
+    pick_and_place:
+      "*": 1.0
+      P0: 2.0
+      P1: 2.0
+      P2: 2.0
+      P3: 2.0
+      P4: 6.0
+      P5: 6.0
+
+  task_configs:
+    pick_and_place:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 50, 250, 0, 0.005]
+
+evaluation:
+  skip_frame: 3
+  fraction: 1.0
+  output_dir: /home/work/l30083605/Casual-World-project/data/cppo_eval_v4

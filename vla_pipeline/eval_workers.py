@@ -8,7 +8,9 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from vla_pipeline.hybrid_policy import EASY_PROTOCOLS, effective_hybrid_beta
+from vla_pipeline.teacher import is_cppo_v2_checkpoint
 from vla_pipeline.quiet_utils import setup_quiet_env, suppress_stdout_stderr
+from vla_pipeline.vla_gpu_client import resolve_vla_gpu_port
 
 
 def episode_integrated_success(episode_obj) -> float:
@@ -16,6 +18,17 @@ def episode_integrated_success(episode_obj) -> float:
         return 0.0
     total = sum(float(i.get("fractional_success", 0.0)) for i in episode_obj.infos)
     return total / len(episode_obj.infos)
+
+
+def _wrap_eval_env(env, protocol, payload):
+    from causal_world.wrappers.protocol_wrapper import ProtocolWrapper
+
+    wrapped = _wrap_eval_env(env, protocol, payload)
+    if payload.get("cppo_v2_obs") or is_cppo_v2_checkpoint(payload.get("teacher_ckpt")):
+        from causal_world.wrappers.protocol_obs_wrapper import ProtocolObsWrapper
+
+        wrapped = ProtocolObsWrapper(wrapped)
+    return wrapped
 
 
 def _teacher_only_for_protocol(payload: Dict[str, Any], protocol_name: str) -> bool:
@@ -26,6 +39,16 @@ def _teacher_only_for_protocol(payload: Dict[str, Any], protocol_name: str) -> b
     task_name = payload.get("task_name", "")
     beta = effective_hybrid_beta(hybrid_cfg, task_name, protocol_name)
     return beta <= 1e-6
+
+
+def _hybrid_cfg_for_worker(payload: Dict[str, Any]) -> dict:
+    """Copy hybrid cfg and attach GPU sidecar port when available."""
+    hybrid_cfg = dict(payload.get("hybrid_cfg") or {})
+    gpu_id = payload.get("gpu_id")
+    port = resolve_vla_gpu_port(gpu_id)
+    if port is not None:
+        hybrid_cfg["vla_gpu_port"] = port
+    return hybrid_cfg
 
 
 def run_protocol_episode_chunk(payload: Dict[str, Any]) -> List[float]:
@@ -82,12 +105,12 @@ def run_protocol_episode_chunk(payload: Dict[str, Any]) -> List[float]:
         data_recorder=recorder,
         enable_visualization=False,
     )
+    wrapped = _wrap_eval_env(env, protocol, payload)
     protocol.init_protocol(
         env=env,
         tracker=env.get_tracker(),
         fraction=float(payload["fraction"]),
     )
-    wrapped = ProtocolWrapper(env, protocol)
 
     teacher_ckpt = payload.get("teacher_ckpt")
     with suppress_stdout_stderr():
@@ -96,7 +119,7 @@ def run_protocol_episode_chunk(payload: Dict[str, Any]) -> List[float]:
     pname = protocol.get_name()
     teacher_only = _teacher_only_for_protocol(payload, pname)
     if payload["use_hybrid"] and not teacher_only:
-        hybrid_cfg = payload["hybrid_cfg"]
+        hybrid_cfg = _hybrid_cfg_for_worker(payload)
         device = "cuda" if gpu_id is not None and gpu_id >= 0 else "cpu"
         with suppress_stdout_stderr():
             policy = build_hybrid_policy(
@@ -200,15 +223,16 @@ def run_eval_worker_batch(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             device = "cuda" if gpu_id is not None and gpu_id >= 0 else "cpu"
             with suppress_stdout_stderr():
                 hybrid_policy = build_hybrid_policy(
-                    payload["hybrid_cfg"],
+                    _hybrid_cfg_for_worker(payload),
                     teacher_fn,
                     task_name,
                     int(payload["image_size"]),
                     device=device,
                 )
             hybrid_policy.eval() if hasattr(hybrid_policy, "eval") else None
-            if hasattr(hybrid_policy, "model"):
-                hybrid_policy.model.eval()
+            if hybrid_policy._remote_client is None:
+                ckpt = hybrid_policy._resolve_checkpoint()
+                hybrid_policy._load_checkpoint(ckpt)[0].eval()
 
         task = generate_task(
             task_generator_id=benchmark["task_generator_id"],
@@ -222,7 +246,7 @@ def run_eval_worker_batch(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
             data_recorder=recorder,
             enable_visualization=False,
         )
-        wrapped = ProtocolWrapper(env, protocol)
+        wrapped = _wrap_eval_env(env, protocol, payload)
         protocol.init_protocol(
             env=env,
             tracker=env.get_tracker(),

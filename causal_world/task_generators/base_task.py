@@ -1023,6 +1023,24 @@ class BaseTask(object):
             update(self.get_task_generator_variables_values())
         return variable_params
 
+    @staticmethod
+    def _values_within_bounds(value, lower_bound, upper_bound):
+        """Return True when *value* lies in the intervention interval.
+
+        Cylindrical angle dims use reversed bounds (e.g. [-pi/6, -5pi/6]);
+        treat those as valid when lower_bound[dim] > upper_bound[dim].
+        """
+        value = np.asarray(value)
+        lower_bound = np.asarray(lower_bound)
+        upper_bound = np.asarray(upper_bound)
+        inverted = lower_bound > upper_bound
+        ok = np.where(
+            inverted,
+            (value >= upper_bound) & (value <= lower_bound),
+            (value >= lower_bound) & (value <= upper_bound),
+        )
+        return bool(np.all(ok))
+
     def is_intervention_in_bounds(self, interventions_dict):
         """
         :param interventions_dict: (dict) specifying the variable names and
@@ -1040,36 +1058,25 @@ class BaseTask(object):
         for intervention in interventions_dict:
             if intervention in intervention_space:
                 if not isinstance(interventions_dict[intervention], dict):
-                    if ((intervention_space[intervention][0] >
-                         interventions_dict[intervention]).any() or \
-                         (intervention_space[intervention][1]
-                             < interventions_dict[intervention]).any()):
-                        logging.warning("lower bound is: " +
-                                        str(intervention_space[intervention][0]))
-                        logging.warning("applied: " +
-                                        str(interventions_dict[intervention]))
-                        logging.warning("upper bound is:" +
-                                        str(intervention_space[intervention][1]))
+                    lo = intervention_space[intervention][0]
+                    hi = intervention_space[intervention][1]
+                    applied = interventions_dict[intervention]
+                    if not self._values_within_bounds(applied, lo, hi):
+                        logging.warning("lower bound is: " + str(lo))
+                        logging.warning("applied: " + str(applied))
+                        logging.warning("upper bound is:" + str(hi))
                         return False
                 else:
                     for sub_variable_name in interventions_dict[intervention]:
-                        if sub_variable_name in intervention_space[intervention] and \
-                            ((intervention_space[intervention]
-                            [sub_variable_name][0] >
-                            interventions_dict[intervention][sub_variable_name]).any() or \
-                                (intervention_space[intervention]
-                                 [sub_variable_name][1] <
-                                 interventions_dict[intervention][sub_variable_name]).any()):
-                            logging.warning("lower bound is:" +
-                                            str(intervention_space
-                                                [intervention][sub_variable_name][0]))
-                            logging.warning("applied:" +
-                                            str(interventions_dict
-                                                [intervention][sub_variable_name]))
-                            logging.warning("upper bound is:" +
-                                            str(intervention_space[intervention]
-                                                [sub_variable_name][1]))
-                            return False
+                        if sub_variable_name in intervention_space[intervention]:
+                            lo = intervention_space[intervention][sub_variable_name][0]
+                            hi = intervention_space[intervention][sub_variable_name][1]
+                            applied = interventions_dict[intervention][sub_variable_name]
+                            if not self._values_within_bounds(applied, lo, hi):
+                                logging.warning("lower bound is:" + str(lo))
+                                logging.warning("applied:" + str(applied))
+                                logging.warning("upper bound is:" + str(hi))
+                                return False
                         elif sub_variable_name not in intervention_space[intervention]:
                             logging.warning("{} not in intervention_space")
                             return False

@@ -1,0 +1,63 @@
+# V4 Teacher-Safe Hybrid — last mile to 0.5743 if CPPPO assembly still short.
+# Uses v3 push/pick + v4 pap router; VLA only on proven-win protocols.
+
+evaluation:
+  baseline_dir: /home/work/l30083605/Casual-World-project/data/baseline_eval
+  episodes_per_protocol: 200
+  fraction: 1.0
+  skip_frame: 3
+  output_dir: /home/work/l30083605/Casual-World-project/data/vla_eval_v4/hybrid_v4
+  target_macro_avg: 0.5743
+
+hybrid:
+  checkpoint: /home/work/l30083605/Casual-World-project/data/vla_checkpoints_v5/bc_best_r01.pt
+  checkpoint_by_task_protocol:
+    pushing:
+      P10: /home/work/l30083605/Casual-World-project/data/vla_checkpoints_v5_rl_gpu/rl_best.pt
+  beta_by_task_protocol:
+    pick_and_place:
+      P0: 0.0
+      P1: 0.0
+      P2: 0.0
+      P3: 0.0
+      P4: 0.0
+      P5: 0.0
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.0
+      P11: 0.0
+    pushing:
+      P0: 0.0
+      P1: 0.0
+      P2: 0.0
+      P3: 0.0
+      P4: 0.0
+      P5: 0.0
+      P6: 0.0
+      P7: 0.0
+      P8: 0.0
+      P9: 0.0
+      P10: 0.0
+      P11: 0.0
+    picking:
+      P0: 0.0
+      P1: 0.0
+      P2: 0.0
+      P3: 0.0
+      P4: 0.0
+      P5: 0.0
+      P6: 0.0
+      P7: 0.0
+      P8: 0.25
+      P9: 0.25
+      P10: 0.0
+      P11: 0.0
+
+teacher:
+  checkpoints:
+    pushing: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage1/pushing/pushing_cppo_v3.zip
+    picking: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage1/picking/picking_cppo_v3.zip
+    pick_and_place: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage2_pap/pick_and_place/intermediate/pick_and_place_cppo_v3_12000000_steps.zip
+  router_config: /home/work/l30083605/Casual-World-project/vla_pipeline/config_cppo_v4_teacher_router.json

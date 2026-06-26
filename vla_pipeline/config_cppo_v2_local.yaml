@@ -1,0 +1,95 @@
+# CPPPO v2 — protocol-conditioned finetune aligned with official baseline PPO settings
+# (scripts/reproduce_experiments.py + baseline_actors/*.zip).
+#
+# Official full pretrain: 100M steps, n_steps=6000, 20 envs (~833 PPO updates).
+# This config keeps the same per-update PPO hyperparams and finetunes 10M steps (~83 updates).
+
+cppo:
+  version: v2
+  checkpoint_dir: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v2_official
+  init_checkpoints:
+    pushing: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/pushing_ppo_curr1.zip
+    picking: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/picking_ppo_curr1.zip
+    pick_and_place: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip
+  num_envs: 20
+  num_envs_by_task:
+    pushing: 20
+    picking: 20
+    pick_and_place: 20
+  seed: 42
+  skip_frame: 3
+  variables_space: space_a
+  total_timesteps: 10000000
+  validate_every_timesteps: 2000000
+  resume: true
+  tasks: [pushing, picking, pick_and_place]
+  warm_start_baseline: true
+
+  sampling:
+    adaptive: true
+    adaptive_alpha: 1.5
+    adaptive_momentum: 0.92
+    hard_protocol_min_weight: 0.08
+    stratified_static_ratio: 0.30
+
+  policy:
+    embed_dim: 64
+    net_arch:
+      - pi: [256, 256]
+        vf: [256, 256]
+
+  ppo:
+    gamma: 0.99
+    n_steps: 6000
+    ent_coef: 0.01
+    learning_rate: 0.00025
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    nminibatches: 40
+    noptepochs: 4
+
+  protocol_weights:
+    pushing:
+      "*": 1.0
+      P6: 3.0
+      P7: 3.0
+      P8: 3.0
+      P9: 3.0
+      P10: 2.5
+      P11: 3.0
+    picking:
+      "*": 1.0
+      P6: 3.0
+      P7: 3.0
+      P8: 3.0
+      P9: 3.0
+      P10: 2.5
+      P11: 3.0
+    pick_and_place:
+      "*": 1.5
+      P1: 2.0
+      P2: 2.5
+      P3: 2.0
+      P4: 2.0
+      P5: 2.5
+      P6: 3.0
+      P7: 3.0
+      P8: 3.0
+      P9: 3.0
+      P10: 2.5
+
+  task_configs:
+    pushing:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 250, 0]
+    picking:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [250, 0, 125, 0, 750, 0, 0, 0.005]
+    pick_and_place:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 50, 250, 0, 0.005]
+
+evaluation:
+  skip_frame: 3
+  fraction: 0.1
+  output_dir: /home/work/l30083605/Casual-World-project/data/cppo_eval_v2_official

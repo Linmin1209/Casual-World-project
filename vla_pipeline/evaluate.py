@@ -167,6 +167,11 @@ def _evaluate_task_parallel(
     hybrid_cfg = dict(cfg.get("hybrid", {}))
     if hybrid_cfg.get("checkpoint"):
         hybrid_cfg["checkpoint"] = os.path.abspath(hybrid_cfg["checkpoint"])
+    ckpt_by_tp = hybrid_cfg.get("checkpoint_by_task_protocol") or {}
+    for task, proto_map in ckpt_by_tp.items():
+        for proto, path in proto_map.items():
+            ckpt_by_tp[task][proto] = os.path.abspath(path)
+    hybrid_cfg["checkpoint_by_task_protocol"] = ckpt_by_tp
 
     pipeline_scores = {}
     all_protocols = benchmark["evaluation_protocols"]

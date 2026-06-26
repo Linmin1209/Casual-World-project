@@ -2,6 +2,8 @@
 
 Vision-language-action policy training for CausalWorld: teacher demos → BC → DAgger → hybrid eval → optional EA-AWR RL fine-tuning.
 
+**CPPPO privileged teachers** (protocol-conditioned PPO, +15% single-ckpt / +20.5% routed): see **[CPPPO.md](CPPPO.md)**.
+
 ## Quick start
 
 ```bash

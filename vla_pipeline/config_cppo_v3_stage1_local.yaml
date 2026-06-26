@@ -1,0 +1,117 @@
+# CPPPO v3 Stage-1 — dual-path residual policy, eval-aligned training, anti-forgetting sampling.
+#
+# v2 diagnosis (full eval macro 0.5467, target 0.5743):
+#   - v2 concat-fusion corrupts baseline fc0 (only 56/120 input cols warm-started)
+#   - pap P4/P5 catastrophic forgetting (-0.42, -0.34)
+#   - hard protocols P6–P9 still near zero on pap / picking P8/P9
+#
+# v3 Stage-1 goals: recover baseline on easy/mid protocols, grow hard-protocol residual.
+# Resume from official baseline actors; Stage-2 continues from Stage-1 checkpoints.
+
+cppo:
+  version: v3
+  stage: 1
+  checkpoint_dir: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage1
+  init_checkpoints:
+    pushing: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/pushing_ppo_curr1.zip
+    picking: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/picking_ppo_curr1.zip
+    pick_and_place: /home/work/l30083605/Casual-World-project/causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip
+  num_envs: 20
+  seed: 42
+  skip_frame: 3
+  # Match eval (_quick_eval uses space_a_b).
+  variables_space: space_a_b
+  total_timesteps: 15000000
+  validate_every_timesteps: 3000000
+  resume: true
+  tasks: [pushing, picking, pick_and_place]
+  warm_start_baseline: true
+
+  sampling:
+    adaptive: true
+    adaptive_alpha: 1.8
+    adaptive_momentum: 0.90
+    hard_protocol_min_weight: 0.12
+    stratified_static_ratio: 0.40
+
+  # Anchor easy/mid protocols; boost hard without starving P0–P5 (pap forgetting fix).
+  anchor_protocols: [P0, P1, P2, P3, P4, P5]
+  anchor_min_sampling_ratio: 0.35
+
+  policy:
+    type: residual
+    embed_dim: 64
+    proto_scale: 1.0
+    net_arch:
+      - pi: [256, 256]
+        vf: [256, 256]
+
+  ppo:
+    gamma: 0.99
+    n_steps: 4096
+    ent_coef: 0.01
+    learning_rate: 0.00015
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    nminibatches: 40
+    noptepochs: 4
+
+  protocol_weights:
+    pushing:
+      "*": 1.0
+      P0: 1.5
+      P1: 1.5
+      P2: 1.5
+      P3: 1.5
+      P4: 1.5
+      P5: 1.5
+      P6: 3.5
+      P7: 3.5
+      P8: 4.0
+      P9: 4.0
+      P10: 3.0
+      P11: 3.5
+    picking:
+      "*": 1.0
+      P0: 1.5
+      P1: 1.5
+      P2: 1.5
+      P3: 1.5
+      P4: 1.5
+      P5: 1.5
+      P6: 3.0
+      P7: 3.0
+      P8: 4.5
+      P9: 4.5
+      P10: 2.5
+      P11: 3.0
+    pick_and_place:
+      "*": 1.0
+      P0: 2.5
+      P1: 2.0
+      P2: 2.0
+      P3: 2.0
+      P4: 2.5
+      P5: 2.5
+      P6: 3.5
+      P7: 3.5
+      P8: 4.0
+      P9: 4.0
+      P10: 3.5
+      P11: 3.5
+
+  task_configs:
+    pushing:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 250, 0]
+    picking:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [250, 0, 125, 0, 750, 0, 0, 0.005]
+    pick_and_place:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 50, 250, 0, 0.005]
+
+evaluation:
+  skip_frame: 3
+  fraction: 0.1
+  output_dir: /home/work/l30083605/Casual-World-project/data/cppo_eval_v3_stage1

@@ -1,6 +1,7 @@
 """Hybrid policy: VLA + privileged PPO teacher with protocol-aware residual blending."""
 from __future__ import annotations
 
+import os
 from collections import deque
 from typing import Callable, Deque, Dict, Optional
 
@@ -10,6 +11,7 @@ import torch
 from vla_pipeline.camera_utils import ensure_tool_cameras
 from vla_pipeline.label_utils import build_instruction
 from vla_pipeline.model_resnet_film_flow import load_policy_from_checkpoint
+from vla_pipeline.torch_compat import resolve_vla_device
 
 EASY_PROTOCOLS = frozenset({"P0", "P1", "P2", "P3", "P4", "P5"})
 
@@ -53,8 +55,12 @@ def build_hybrid_policy(hybrid_cfg, teacher_fn, task_name: str, image_size: int,
             hybrid_cfg.get("alpha_default", hybrid_cfg.get("alpha", 0.35)),
         )
     )
+    ckpt_by_tp = hybrid_cfg.get("checkpoint_by_task_protocol") or {}
+    for task, proto_map in ckpt_by_tp.items():
+        for proto, path in proto_map.items():
+            ckpt_by_tp[task][proto] = os.path.abspath(path)
     return HybridVLAPolicy(
-        vla_checkpoint=hybrid_cfg["checkpoint"],
+        vla_checkpoint=os.path.abspath(hybrid_cfg["checkpoint"]),
         teacher_fn=teacher_fn,
         alpha=alpha,
         image_size=image_size,
@@ -66,6 +72,8 @@ def build_hybrid_policy(hybrid_cfg, teacher_fn, task_name: str, image_size: int,
         beta_by_task_protocol=hybrid_cfg.get("beta_by_task_protocol"),
         alpha_by_protocol=hybrid_cfg.get("alpha_by_protocol"),
         max_correction=hybrid_cfg.get("max_correction"),
+        checkpoint_by_task_protocol=ckpt_by_tp,
+        vla_gpu_port=hybrid_cfg.get("vla_gpu_port"),
     )
 
 
@@ -92,6 +100,8 @@ class HybridVLAPolicy:
         beta_by_task_protocol: Optional[Dict[str, Dict[str, float]]] = None,
         alpha_by_protocol: Optional[Dict[str, float]] = None,
         max_correction: Optional[float] = None,
+        checkpoint_by_task_protocol: Optional[Dict[str, Dict[str, str]]] = None,
+        vla_gpu_port: Optional[int] = None,
     ):
         self.teacher_fn = teacher_fn
         self.alpha = float(alpha)
@@ -102,16 +112,63 @@ class HybridVLAPolicy:
         self.beta_by_task_protocol = beta_by_task_protocol or {}
         self.alpha_by_protocol = alpha_by_protocol or {}
         self.max_correction = float(max_correction) if max_correction is not None else None
-        self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
+        self._remote_client = None
+        port = vla_gpu_port
+        if port is None:
+            env_port = os.environ.get("VLA_GPU_PORT", "").strip()
+            if env_port:
+                port = int(env_port)
+        if port is not None:
+            from vla_pipeline.vla_gpu_client import VlaGpuClient
 
-        self.model, meta = load_policy_from_checkpoint(vla_checkpoint, self.device)
-        self.image_size = meta.get("image_size", image_size)
-        self.action_horizon = int(meta.get("action_horizon", 1))
+            self._remote_client = VlaGpuClient(port=int(port))
+            self.device = torch.device("cpu")
+        else:
+            self.device = resolve_vla_device(device)
+        self.default_checkpoint = vla_checkpoint
+        self.checkpoint_by_task_protocol = checkpoint_by_task_protocol or {}
+
+        self._model_cache: Dict[str, torch.nn.Module] = {}
+        self._meta_cache: Dict[str, dict] = {}
+        if self._remote_client is None:
+            meta = self._load_checkpoint(vla_checkpoint)[1]
+            self.image_size = meta.get("image_size", image_size)
+            self.action_horizon = int(meta.get("action_horizon", 1))
+        else:
+            self.image_size = image_size
+            self.action_horizon = 1
 
         self._action_queue: Deque[np.ndarray] = deque()
         self._task_name = None
         self._protocol = None
         self._env = None
+        self._active_checkpoint: Optional[str] = None
+
+    def _load_checkpoint(self, path: str):
+        if path not in self._model_cache:
+            model, meta = load_policy_from_checkpoint(path, self.device)
+            self._model_cache[path] = model
+            self._meta_cache[path] = meta
+        return self._model_cache[path], self._meta_cache[path]
+
+    def _resolve_checkpoint(self) -> str:
+        if self._task_name and self._protocol:
+            override = (self.checkpoint_by_task_protocol.get(self._task_name) or {}).get(
+                self._protocol
+            )
+            if override:
+                return override
+        return self.default_checkpoint
+
+    @property
+    def model(self) -> torch.nn.Module:
+        if self._remote_client is not None:
+            raise RuntimeError("VLA runs on GPU sidecar; no local model")
+        ckpt = self._resolve_checkpoint()
+        if ckpt != self._active_checkpoint:
+            self._action_queue.clear()
+            self._active_checkpoint = ckpt
+        return self._load_checkpoint(ckpt)[0]
 
     def _mix_weight(self) -> float:
         """Weight on VLA correction (residual) or (1-alpha) in linear blend."""
@@ -159,13 +216,20 @@ class HybridVLAPolicy:
             tensors.append(t)
         while len(tensors) < 3:
             tensors.append(tensors[-1])
-        return torch.stack(tensors, dim=0).unsqueeze(0).to(self.device)
+        return torch.stack(tensors, dim=0).unsqueeze(0)
 
     def _plan_chunk(self) -> None:
         state = self._env.get_current_state_variables()
         instr = build_instruction(self._task_name, state, protocol=self._protocol)
-        views = self._views_tensor(self._env._robot)
-        chunk = self.model.sample_action_chunk(views, [instr]).cpu().numpy()[0]
+        if self._remote_client is not None:
+            views = self._views_tensor(self._env._robot).numpy()
+            ckpt = self._resolve_checkpoint()
+            chunk = self._remote_client.infer(ckpt, views, instr)
+            if chunk.ndim == 3:
+                chunk = chunk[0]
+        else:
+            views = self._views_tensor(self._env._robot).to(self.device)
+            chunk = self.model.sample_action_chunk(views, [instr]).cpu().numpy()[0]
         chunk = np.clip(chunk, -1.0, 1.0)
         for h in range(chunk.shape[0]):
             self._action_queue.append(chunk[h].astype(np.float32))

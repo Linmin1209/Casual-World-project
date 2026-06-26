@@ -1,0 +1,53 @@
+{
+  "title": "CPPPO v4 protocol-routed expert assembly",
+  "description": "Per-protocol teacher routing: CPPPO where strong, baseline where CPPPO regressed on full eval.",
+  "metric": "mean_full_integrated_fractional_success",
+  "eval_mode": "assemble_from_200ep_full_eval",
+  "eval_sources": {
+    "cppo_v3_stage1": {
+      "pushing": "data/cppo_eval_v3_stage1/pushing_full_eval.json",
+      "picking": "data/cppo_eval_v3_stage1/picking_full_eval.json"
+    },
+    "cppo_v3_s2_12M": "data/cppo_eval_v4/pick_and_place_full_eval.json",
+    "cppo_v2": "data/cppo_eval_v2_official/pick_and_place_full_eval.json",
+    "baseline": "data/baseline_eval/summary_all_tasks.json"
+  },
+  "tasks": {
+    "pushing": {
+      "default_checkpoint": "data/cppo_checkpoints_v3_stage1/pushing/pushing_cppo_v3.zip",
+      "default_eval_source": "cppo_v3_stage1",
+      "protocol_overrides": {}
+    },
+    "picking": {
+      "default_checkpoint": "data/cppo_checkpoints_v3_stage1/picking/picking_cppo_v3.zip",
+      "default_eval_source": "cppo_v3_stage1",
+      "protocol_overrides": {}
+    },
+    "pick_and_place": {
+      "default_checkpoint": "data/cppo_checkpoints_v3_stage2_pap/pick_and_place/intermediate/pick_and_place_cppo_v3_12000000_steps.zip",
+      "default_eval_source": "cppo_v3_s2_12M",
+      "protocol_overrides": {
+        "P4": {
+          "checkpoint": "causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip",
+          "eval_source": "baseline",
+          "rationale": "s2_12M full=0.114 vs baseline=0.443"
+        },
+        "P5": {
+          "checkpoint": "causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip",
+          "eval_source": "baseline",
+          "rationale": "s2_12M full=0.007 vs baseline=0.427"
+        },
+        "P6": {
+          "checkpoint": "causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip",
+          "eval_source": "baseline",
+          "rationale": "CPPPO=0; baseline=0.046"
+        },
+        "P7": {
+          "checkpoint": "causal_world/assets/baseline_actors/pick_and_place_ppo_curr0.zip",
+          "eval_source": "baseline",
+          "rationale": "CPPPO=0; baseline=0.195"
+        }
+      }
+    }
+  }
+}

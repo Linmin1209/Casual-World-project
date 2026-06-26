@@ -1,0 +1,84 @@
+# CPPPO v3 Stage-2b — pushing/picking hard-protocol polish (short run).
+#
+# v3 s1 already strong on P6-P11 (push) and P10/P11 (pick).
+# Stage-2b ONLY targets remaining weak protocols: push P8/P9, pick P8/P9.
+# Keep run short (3M) to avoid regressing strong protocols.
+
+cppo:
+  version: v3
+  stage: 2
+  checkpoint_dir: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage2_hard
+  init_checkpoints:
+    pushing: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage1/pushing/pushing_cppo_v3.zip
+    picking: /home/work/l30083605/Casual-World-project/data/cppo_checkpoints_v3_stage1/picking/picking_cppo_v3.zip
+  num_envs: 20
+  seed: 42
+  skip_frame: 3
+  variables_space: space_a_b
+  total_timesteps: 3000000
+  validate_every_timesteps: 1000000
+  resume: true
+  tasks: [pushing, picking]
+  warm_start_baseline: false
+
+  protocol_allowlist_by_task:
+    pushing: [P0, P1, P2, P3, P8, P9, P11]
+    picking: [P0, P5, P8, P9]
+
+  sampling:
+    adaptive: true
+    adaptive_alpha: 2.0
+    adaptive_momentum: 0.90
+    hard_protocol_min_weight: 0.15
+    stratified_static_ratio: 0.55
+
+  anchor_protocols: [P0, P1, P2, P3, P5]
+  anchor_min_sampling_ratio: 0.35
+
+  policy:
+    type: residual
+    embed_dim: 64
+    proto_scale: 1.0
+    net_arch:
+      - pi: [256, 256]
+        vf: [256, 256]
+
+  ppo:
+    gamma: 0.99
+    n_steps: 2048
+    ent_coef: 0.006
+    learning_rate: 0.00003
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    nminibatches: 40
+    noptepochs: 4
+
+  protocol_weights:
+    pushing:
+      "*": 1.0
+      P0: 3.0
+      P1: 3.0
+      P2: 3.0
+      P3: 3.0
+      P8: 5.0
+      P9: 5.0
+      P11: 3.0
+    picking:
+      "*": 1.0
+      P0: 3.0
+      P5: 3.0
+      P8: 6.0
+      P9: 6.0
+
+  task_configs:
+    pushing:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [750, 250, 0]
+    picking:
+      fractional_reward_weight: 1.0
+      dense_reward_weights: [250, 0, 125, 0, 750, 0, 0, 0.005]
+
+evaluation:
+  skip_frame: 3
+  fraction: 0.1
+  output_dir: /home/work/l30083605/Casual-World-project/data/cppo_eval_v3_stage2_hard
